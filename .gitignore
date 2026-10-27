@@ -1,0 +1,13 @@
+# Sinh ra bởi XcodeGen — tạo lại bằng `xcodegen generate`
+*.xcodeproj
+PoseNy/Info.plist
+
+# Xcode
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+
+# macOS / Windows
+.DS_Store
+Thumbs.db

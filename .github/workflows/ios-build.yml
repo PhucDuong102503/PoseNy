@@ -1,0 +1,46 @@
+name: iOS Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # Build cho iPhone thật nhưng KHÔNG ký — Sideloadly trên Windows sẽ ký bằng Apple ID của bạn.
+      - name: Build for iPhone (unsigned)
+        run: |
+          xcodebuild \
+            -project PoseNy.xcodeproj \
+            -scheme PoseNy \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/PoseNy.app Payload/
+          zip -qry PoseNy.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PoseNy-ipa
+          path: PoseNy.ipa
+          retention-days: 30
