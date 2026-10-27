@@ -95,7 +95,9 @@ enum PoseMatcher {
         let sizeRatio = liveBox.height / max(refBox.height, 0.01)
         let dx = liveBox.midX - refBox.midX
         let dy = liveBox.midY - refBox.midY
-        let framingScore = Double(max(0, 1 - abs(log(sizeRatio)) * 1.2 - abs(dx) * 2 - abs(dy) * 2))
+        let sizePenalty: Double = abs(log(Double(sizeRatio))) * 1.2
+        let offsetPenalty: Double = (abs(Double(dx)) + abs(Double(dy))) * 2
+        let framingScore: Double = max(0, 1 - sizePenalty - offsetPenalty)
 
         let total = Int(((poseScore * 0.8 + framingScore * 0.2) * 100).rounded())
 
