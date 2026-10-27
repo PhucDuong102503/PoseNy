@@ -9,17 +9,19 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install tools
+        run: brew install xcodegen xcbeautify
 
       - name: Generate Xcode project
         run: xcodegen generate
 
       # Build cho iPhone thật nhưng KHÔNG ký — Sideloadly trên Windows sẽ ký bằng Apple ID của bạn.
+      # xcbeautify đưa lỗi biên dịch thành annotation, xem được công khai trên trang Actions.
       - name: Build for iPhone (unsigned)
         run: |
+          set -o pipefail
           xcodebuild \
             -project PoseNy.xcodeproj \
             -scheme PoseNy \
@@ -30,7 +32,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | xcbeautify --renderer github-actions
 
       - name: Package IPA
         run: |
