@@ -7,7 +7,7 @@ và AI nhận diện khung xương để chỉ dẫn từng chi tiết ("Đưa b
 
 | Roadmap | Đã làm |
 |---|---|
-| **Bước 1: Thư viện dáng** | 11 dáng mẫu, lọc theo hoàn cảnh (Cà phê, Biển, Dạo phố, Hoàng hôn) và đối tượng (Nữ, Nam, Cặp đôi). Mỗi dáng có góc máy, ống kính, biểu cảm và mẹo chụp. Lưu dáng yêu thích. |
+| **Bước 1: Thư viện dáng** | 27 dáng mẫu (đứng, ngồi, nửa người, cặp đôi), lọc theo hoàn cảnh (Cà phê, Biển, Dạo phố, Hoàng hôn) và đối tượng (Nữ, Nam, Cặp đôi). Mỗi dáng có góc máy, ống kính, biểu cảm và mẹo chụp. Lưu dáng yêu thích. |
 | **Bước 2: Camera & Overlay** | Hình bóng dáng mẫu hiện mờ trên camera (chỉnh được độ đậm). Lưới 1/3, thước cân bằng bằng con quay hồi chuyển, zoom 0.5x/1x/2x (tự chọn theo dáng), đổi camera trước/sau, chụp và lưu vào Ảnh. |
 | **Bước 3: AI** | Apple Vision nhận diện khung xương theo thời gian thực (hỗ trợ cặp đôi, 2 người). App chấm điểm 0–100, tô đỏ bộ phận đang sai và đưa ra lời hướng dẫn bằng tiếng Việt. Máy rung khi khớp dáng, có thể bật tự chụp khi giữ đúng dáng 1.2 giây. |
 
