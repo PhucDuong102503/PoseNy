@@ -9,6 +9,8 @@ final class PoseCoach: ObservableObject {
     @Published private(set) var holdProgress: Double = 0
     /// Tăng mỗi khi cần tự bấm máy. View lắng nghe thay đổi này.
     @Published private(set) var autoShotCount = 0
+    /// Dáng mẫu bám theo người, đã làm mượt để không bị rung.
+    @Published private(set) var fittedBodies: [Skeleton] = []
 
     private static let enterPerfect = 82.0
     private static let exitPerfect = 76.0
@@ -27,11 +29,13 @@ final class PoseCoach: ObservableObject {
         isPerfect = false
         holdProgress = 0
         perfectSince = nil
+        fittedBodies = []
     }
 
     func update(reference: [Skeleton], detected: [Skeleton], aspect: CGFloat, mirrored: Bool, autoCapture: Bool) {
         let r = PoseMatcher.match(reference: reference, detected: detected, aspect: aspect, mirrored: mirrored)
         result = r
+        fittedBodies = Self.smooth(previous: fittedBodies, next: r.fittedBodies)
         smoothed = smoothed * 0.75 + Double(r.score) * 0.25
         score = Int(smoothed.rounded())
 
@@ -56,6 +60,21 @@ final class PoseCoach: ObservableObject {
             perfectSince = nil
             holdProgress = 0
             autoShotCount += 1
+        }
+    }
+
+    private static func smooth(previous: [Skeleton], next: [Skeleton]) -> [Skeleton] {
+        guard previous.count == next.count else { return next }
+        return zip(previous, next).map { old, new in
+            var points: [Joint: CGPoint] = [:]
+            for (joint, p) in new.points {
+                if let o = old[joint] {
+                    points[joint] = CGPoint(x: o.x * 0.6 + p.x * 0.4, y: o.y * 0.6 + p.y * 0.4)
+                } else {
+                    points[joint] = p
+                }
+            }
+            return Skeleton(points)
         }
     }
 }

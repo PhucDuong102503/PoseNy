@@ -20,13 +20,23 @@ struct FrameMapper {
     var bottom: CGFloat { rect.maxY }
 }
 
+enum SilhouetteStyle {
+    /// Tô đặc (ảnh minh hoạ trong thư viện).
+    case solid
+    /// Tô mờ + viền rõ (dáng mẫu trên camera).
+    case ghost
+    /// Chỉ viền nét đứt (vị trí bố cục gợi ý).
+    case outline
+}
+
 enum SkeletonRenderer {
-    private static let limbBones: [(Joint, Joint)] = [
-        (.leftShoulder, .leftElbow), (.leftElbow, .leftWrist),
-        (.rightShoulder, .rightElbow), (.rightElbow, .rightWrist),
-        (.leftHip, .leftKnee), (.leftKnee, .leftAnkle),
-        (.rightHip, .rightKnee), (.rightKnee, .rightAnkle),
-        (.neck, .nose),
+    /// Các đoạn chi: (khớp đầu, khớp cuối, bán kính đầu, bán kính cuối) theo tỉ lệ độ dài thân.
+    private static let limbs: [(Joint, Joint, CGFloat, CGFloat)] = [
+        (.neck, .nose, 0.08, 0.08),
+        (.leftShoulder, .leftElbow, 0.085, 0.065), (.leftElbow, .leftWrist, 0.065, 0.045),
+        (.rightShoulder, .rightElbow, 0.085, 0.065), (.rightElbow, .rightWrist, 0.065, 0.045),
+        (.leftHip, .leftKnee, 0.12, 0.08), (.leftKnee, .leftAnkle, 0.08, 0.05),
+        (.rightHip, .rightKnee, 0.12, 0.08), (.rightKnee, .rightAnkle, 0.08, 0.05),
     ]
 
     /// Kích thước cơ thể trên màn hình (≈ độ dài thân), dùng để tính độ dày nét.
@@ -41,41 +51,85 @@ enum SkeletonRenderer {
         return mapper.height * 0.2
     }
 
-    /// Vẽ hình bóng (silhouette) của dáng mẫu bằng một màu đặc.
-    static func drawSilhouette(_ s: Skeleton, in context: GraphicsContext, mapper: FrameMapper, color: Color) {
-        let scale = bodyScale(s, mapper)
-        let width = scale * 0.15
-        let p: (Joint) -> CGPoint? = { s[$0].map(mapper.point) }
-        let shading = GraphicsContext.Shading.color(color)
+    /// Vẽ hình bóng (silhouette) có khối của một người.
+    static func drawSilhouette(_ s: Skeleton, in context: GraphicsContext, mapper: FrameMapper,
+                               color: Color, style: SilhouetteStyle = .solid) {
+        let path = bodyPath(s, mapper: mapper)
+        switch style {
+        case .solid:
+            context.fill(path, with: .color(color))
+        case .ghost:
+            context.fill(path, with: .color(color.opacity(0.35)))
+            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 2.5, lineJoin: .round))
+        case .outline:
+            context.stroke(path, with: .color(color.opacity(0.8)),
+                           style: StrokeStyle(lineWidth: 1.5, lineJoin: .round, dash: [6, 5]))
+        }
+    }
 
-        // Thân
+    /// Ghép thân, đầu, tay chân (thon dần) thành một khối liền để có đường viền ngoài.
+    private static func bodyPath(_ s: Skeleton, mapper: FrameMapper) -> Path {
+        let scale = bodyScale(s, mapper)
+        let p: (Joint) -> CGPoint? = { s[$0].map(mapper.point) }
+        var pieces: [Path] = []
+
+        // Thân: nới hông ra ngoài một chút để eo-hông có hình dáng tự nhiên.
         if let ls = p(.leftShoulder), let rs = p(.rightShoulder) {
             var torso = Path()
             if let lh = p(.leftHip), let rh = p(.rightHip) {
-                torso.addLines([ls, rs, rh, lh])
+                let dx = lh.x - rh.x, dy = lh.y - rh.y
+                let len = max(hypot(dx, dy), 0.001)
+                let off = scale * 0.07
+                let lhOut = CGPoint(x: lh.x + dx / len * off, y: lh.y + dy / len * off)
+                let rhOut = CGPoint(x: rh.x - dx / len * off, y: rh.y - dy / len * off)
+                torso.addLines([ls, rs, rhOut, lhOut])
             } else {
                 // Dáng nửa người: kéo thân xuống tới mép dưới khung.
                 torso.addLines([ls, rs, CGPoint(x: rs.x, y: mapper.bottom), CGPoint(x: ls.x, y: mapper.bottom)])
             }
             torso.closeSubpath()
-            context.fill(torso, with: shading)
-            context.stroke(torso, with: shading, style: StrokeStyle(lineWidth: width, lineJoin: .round))
+            pieces.append(torso)
+            pieces.append(circle(ls, scale * 0.09))
+            pieces.append(circle(rs, scale * 0.09))
         }
 
-        // Tay, chân, cổ
-        var limbs = Path()
-        for (a, b) in limbBones {
+        for (a, b, ra, rb) in limbs {
             guard let pa = p(a), let pb = p(b) else { continue }
-            limbs.move(to: pa)
-            limbs.addLine(to: pb)
+            pieces.append(contentsOf: taperedLimb(pa, pb, ra * scale, rb * scale))
         }
-        context.stroke(limbs, with: shading, style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
 
-        // Đầu
-        if let nose = p(.nose) {
-            let r = scale * 0.27
-            context.fill(Path(ellipseIn: CGRect(x: nose.x - r, y: nose.y - r * 1.15, width: r * 2, height: r * 2.2)), with: shading)
+        // Bàn tay và đầu
+        for wrist in [Joint.leftWrist, .rightWrist] {
+            if let w = p(wrist) { pieces.append(circle(w, scale * 0.06)) }
         }
+        if let nose = p(.nose) {
+            let r = scale * 0.25
+            pieces.append(Path(ellipseIn: CGRect(x: nose.x - r, y: nose.y - r * 1.2, width: r * 2, height: r * 2.3)))
+        }
+
+        guard var body = pieces.first else { return Path() }
+        for piece in pieces.dropFirst() { body = body.union(piece) }
+        return body
+    }
+
+    /// Đoạn chi thon dần: hình thang nối hai hình tròn bán kính khác nhau.
+    private static func taperedLimb(_ a: CGPoint, _ b: CGPoint, _ ra: CGFloat, _ rb: CGFloat) -> [Path] {
+        let dx = b.x - a.x, dy = b.y - a.y
+        let len = max(hypot(dx, dy), 0.001)
+        let nx = -dy / len, ny = dx / len
+        var quad = Path()
+        quad.addLines([
+            CGPoint(x: a.x + nx * ra, y: a.y + ny * ra),
+            CGPoint(x: b.x + nx * rb, y: b.y + ny * rb),
+            CGPoint(x: b.x - nx * rb, y: b.y - ny * rb),
+            CGPoint(x: a.x - nx * ra, y: a.y - ny * ra),
+        ])
+        quad.closeSubpath()
+        return [quad, circle(a, ra), circle(b, rb)]
+    }
+
+    private static func circle(_ c: CGPoint, _ r: CGFloat) -> Path {
+        Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2))
     }
 
     /// Vẽ khung xương người thật đang được AI nhận diện.
@@ -123,8 +177,10 @@ struct PoseFigureView: View {
 }
 
 /// Lớp phủ trên camera: hình bóng dáng mẫu và khung xương người thật.
+/// Khi có `fitted`, dáng mẫu bám theo người; dáng gốc chỉ còn là viền nét đứt gợi ý bố cục.
 struct PoseOverlay: View {
     let reference: [Skeleton]
+    let fitted: [Skeleton]
     let live: [Skeleton]
     let aspect: CGFloat
     let opacity: Double
@@ -139,9 +195,19 @@ struct PoseOverlay: View {
             var refContext = context
             refContext.opacity = opacity
             refContext.addFilter(.shadow(color: .black.opacity(0.5), radius: 4))
+            let color: Color = isPerfect ? .green : .white
             refContext.drawLayer { layer in
-                for body in reference {
-                    SkeletonRenderer.drawSilhouette(body, in: layer, mapper: mapper, color: isPerfect ? .green : .white)
+                if fitted.isEmpty {
+                    for body in reference {
+                        SkeletonRenderer.drawSilhouette(body, in: layer, mapper: mapper, color: color, style: .ghost)
+                    }
+                } else {
+                    for body in reference {
+                        SkeletonRenderer.drawSilhouette(body, in: layer, mapper: mapper, color: .white, style: .outline)
+                    }
+                    for body in fitted {
+                        SkeletonRenderer.drawSilhouette(body, in: layer, mapper: mapper, color: color, style: .ghost)
+                    }
                 }
             }
 

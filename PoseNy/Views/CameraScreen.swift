@@ -13,6 +13,7 @@ struct CameraScreen: View {
     @AppStorage("showLevel") private var showLevel = true
     @AppStorage("aiEnabled") private var aiEnabled = true
     @AppStorage("autoCapture") private var autoCapture = false
+    @AppStorage("fitToBody") private var fitToBody = true
     @AppStorage("overlayOpacity") private var overlayOpacity = 0.55
 
     @State private var flash = false
@@ -28,6 +29,12 @@ struct CameraScreen: View {
         return pose == nil ? camera.bodies : (coach.result?.matchedBodies ?? [])
     }
 
+    /// Dáng mẫu đã bám theo người mẫu; rỗng khi tắt chế độ này hoặc chưa thấy người.
+    private var fittedBodies: [Skeleton] {
+        guard aiEnabled, fitToBody, pose != nil else { return [] }
+        return coach.fittedBodies
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -39,6 +46,7 @@ struct CameraScreen: View {
                 if showGrid { GridOverlay() }
                 PoseOverlay(
                     reference: pose?.bodies ?? [],
+                    fitted: fittedBodies,
                     live: liveBodies,
                     aspect: camera.imageAspect,
                     opacity: overlayOpacity,
@@ -123,6 +131,7 @@ struct CameraScreen: View {
             toggle("level", isOn: $showLevel, label: "Thước cân bằng")
             toggle("figure.arms.open", isOn: $aiEnabled, label: "AI nhận diện dáng")
             if pose != nil {
+                toggle("person.fill.viewfinder", isOn: $fitToBody, label: "Dáng mẫu bám theo người")
                 toggle("timer", isOn: $autoCapture, label: "Tự chụp khi khớp dáng")
             }
             Menu {

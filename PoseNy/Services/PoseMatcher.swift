@@ -39,6 +39,8 @@ struct MatchResult {
     var matchedBodies: [Skeleton]
     /// Đoạn chi đang sai nhiều nhất, được tô đỏ trên màn hình.
     var focus: Focus?
+    /// Dáng mẫu đã được "mặc" lên từng người (cùng thứ tự với matchedBodies).
+    var fittedBodies: [Skeleton] = []
 }
 
 /// So khớp tư thế thật với dáng mẫu.
@@ -140,7 +142,8 @@ enum PoseMatcher {
             feedback = "Gần đúng rồi, giữ nguyên nhé…"
         }
 
-        return MatchResult(score: total, feedback: feedback, matchedBodies: lives, focus: focus)
+        let fitted = zip(refs, lives).map { PoseFitter.fit($0, to: $1, aspect: aspect) ?? $0 }
+        return MatchResult(score: total, feedback: feedback, matchedBodies: lives, focus: focus, fittedBodies: fitted)
     }
 
     // MARK: - Lời khuyên cho từng bộ phận
